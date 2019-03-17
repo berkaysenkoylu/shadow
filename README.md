@@ -1,5 +1,3 @@
 # shadow
 
-<p align="center">
-  <img src="https://drive.google.com/open?id=1Euy0LKDP-Iggx0q670vm2l1N9PQFpK6H" title="Example">
-</p>
+![alt tag](https://user-images.githubusercontent.com/28708647/54489311-f51e5200-48bb-11e9-9ad6-623390769514.png)
