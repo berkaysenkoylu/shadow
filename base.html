@@ -1,0 +1,158 @@
+<!--
+Name: Berkay Şenköylü
+Id: N16226846
+-->
+
+<!DOCTYPE html>
+<html>
+<head>
+	<title>Shadow</title>
+	<style>
+		body{background-color: black; color: white; font-size: 15pt;}
+		canvas{background-color: white;}
+	</style>
+
+	<!-- Shaders for shadow mapping -->
+	<script id="shadow-vs" type="x-shader/x-vertex">
+		// Vertex position attribute
+		attribute vec4 aPosition;
+
+		// Model view projection matrix in the light's perspective
+		uniform mat4 uMvpMatrix;
+
+		void main(){
+			// Vertex coordinates in screen space (in the perspective of the light source)
+			gl_Position = uMvpMatrix * aPosition;
+		}	
+	</script>
+
+	<script id="shadow-fs" type="x-shader/x-vertex">
+		precision mediump float;
+
+		void main(){
+			// Since the r component of texture map has a 8 bit precision, shadow cannot be 
+			// calculated correctly when light is very far. To solve this, we separate the data
+			// and store it in multiple components: r, g, b, and a, that is we store the data in 4 bytes.
+
+			// We store the values greater than 1/256 in R, values less than 1/256 but greater than 1 / (256 * 256)
+			// in G, and values less than 1 / (256 * 256) but greater than 1 / (256 * 256 * 256) in B and the rest is stored 
+			// in A component.
+			const vec4 separateToOtherComponents = vec4(1.0, 256.0, 256.0 * 256.0, 256.0 * 256.0 * 256.0);
+
+			// 1/256 represents 1 byte
+			const vec4 bitMap = vec4(1.0/256.0, 1.0/256.0, 1.0/256.0, 0.0);
+
+			// Using built-in method 'fract', we get rid of the values that don't fit in 1 byte 
+			vec4 depthInformation = fract(gl_FragCoord.z * separateToOtherComponents);
+
+			// To save the z component using all four components, we need to substitute the values in depthInformation
+			// which don't fit 1 byte.
+			depthInformation -= depthInformation.gbaa * bitMap;
+
+			gl_FragColor = depthInformation;
+		}
+	</script>
+	<!-- ========================= -->
+
+	<!-- Normal Shaders -->
+	<script id="normal-vs" type="x-shader/x-vertex">
+		// Vertex position attribute
+		attribute vec4 aPosition;
+
+		// Color attribute
+		attribute vec4 aColor;
+
+		// Model view projection matrix in the camera's perspective
+		uniform mat4 uMvpMatrix;
+
+		// Model view projection matrix in the light's perspective
+		uniform mat4 uMvpMatrixFromLight;
+
+		// Distance between each vertex and the light source
+		varying vec4 vPositionFromLight;
+
+		// Color
+		varying vec4 vColor;
+
+		void main(void){
+			// Vertex positions in screen space
+			gl_Position = uMvpMatrix * aPosition;
+
+			// Distance between each vertex and the light source in screen space
+			vPositionFromLight = uMvpMatrixFromLight * aPosition;
+
+			// Set the color
+			vColor = aColor;
+		}
+	</script>
+
+	<script id="normal-fs" type="x-shader/x-vertex">
+		precision mediump float;
+
+		uniform sampler2D uShadowMap;
+
+		// Distance between each vertex and the light source
+		varying vec4 vPositionFromLight;
+
+		// Color
+		varying vec4 vColor;
+
+		void main(void){
+			// vPositionFromLight.xyz is in webGL coordinate system, which is [-1, 1]. However,
+			// to correspond them to the texture coordinates, we need them in [0, 1] since texture
+			// coordinates are in [0, 1]. To achieve this, divide them by wth coordinate to get to cartesian 
+			// coordinate system and divide them by 2, and add 0.5 to the found value: [-0.5 + 0.5, 0.5 + 0.5] = [0.0, 1.0]
+			vec3 fragmentCoord = (vPositionFromLight.xyz / vPositionFromLight.w) / 2.0 + 0.5;
+
+			// Get the depth information from shadow texture
+			vec4 depthInformation = texture2D(uShadowMap, fragmentCoord.xy);
+
+			// Since we saved the values in separate components of depthInformation,
+			// we need to convert them back to 1 value. Take the reciprocal
+			// of the separateToOtherComponents value. Then, we take the dot product
+			// of it with depthInformation to get the desired value.
+			const vec4 separateToOtherComponentsReciprocal = vec4(1.0, 1.0/256.0, 1.0/(256.0 * 256.0), 1.0/(256.0 * 256.0 * 256.0));
+			float depth = dot(depthInformation, separateToOtherComponentsReciprocal); 
+
+			// I didn't use the light in a conventional sense. Basically, if something is lit up,
+			// its visibility is 1.0. If not, I assume it still receives some ambient light,
+			// therefore I set the visibility to 0.75. If this value decreases, the shadow becomes
+			// darker and sharper.
+			// A basic comparison is needed here. If the fragment's location is greater than
+			// light's depth value, then we know that there is an obstacle between the light and 
+			// the fragment, therefore, we reduce the visibility of it.
+			float visibility = (fragmentCoord.z > depth + 0.0015) ? 0.75 : 1.0;
+
+			// Multiply the value of the visibility, which varies between 0.75 and 1.0, and set the color.
+			gl_FragColor = vec4(vColor.rgb * visibility, vColor.a);
+		}
+	</script>
+	<!-- ============== -->
+</head>
+
+<body onload="main()">
+	<canvas id="shadow" width="400" height="400">
+		Your browser doesn't seem to support webGL, get a new one.
+	</canvas>
+	<div id="ui">
+
+	</div>
+
+	<script src="utility/webgl-utils.js"></script>
+	<script src="utility/webgl-debug.js"></script>
+	<script src="utility/matrix.js"></script>
+	<script src="Program.js"></script>
+	<script src="Mesh.js"></script>
+	<script src="UI.js"></script>
+	<script src="Input.js"></script>
+	<script src="Miscellaneous.js"></script>
+	<script src="frameBufferObject.js"></script>
+	<script src="SceneObject.js"></script>
+	<script src="Camera.js"></script>
+	<script src="Light.js"></script>
+	<script src="Main.js"></script>
+	
+
+</body>
+
+</html>
